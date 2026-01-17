@@ -4,67 +4,76 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-function extractJson(text) {
-  const firstBrace = text.indexOf("{");
-  const lastBrace = text.lastIndexOf("}");
-  if (firstBrace === -1 || lastBrace === -1) {
-    throw new Error("No JSON found in AI response");
-  }
-  return JSON.parse(text.slice(firstBrace, lastBrace + 1));
+/* ---------- Helpers ---------- */
+
+function safeExtractJSON(text) {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error("No JSON found");
+  return JSON.parse(match[0]);
 }
 
-async function generateStructuredRFP(userText) {
-  const prompt = `
-Convert the following procurement request into structured JSON.
+function extractBudgetFromText(text) {
+  const match = text.match(/\$?(\d{4,6})/);
+  return match ? Number(match[1]) : 0;
+}
 
-Rules:
-- Return ONLY valid JSON
-- Do NOT add explanations
-- Do NOT wrap in markdown
+/* ---------- RFP Generation ---------- */
 
-JSON fields:
-- title
-- description
-- budget (number)
-- items (array of { name, quantity, specs })
-- deliveryTimeline
-- paymentTerms
-- warranty
+async function generateRfpUsingAI(userText) {
+  const response = await client.responses.create({
+    model: "gpt-5-nano",
+    input: `
+You are an API.
+
+Return ONLY valid JSON.
+No explanations. No markdown.
+
+Schema:
+{
+  "title": string,
+  "description": string,
+  "budget": number,
+  "items": [{ "name": string, "quantity": number, "specs": string }],
+  "deliveryTimeline": string,
+  "paymentTerms": string,
+  "warranty": string
+}
 
 Text:
 """${userText}"""
-`;
-
-  const response = await client.chat.completions.create({
-    model: "gpt-5-nano",
-    messages: [
-      { role: "user", content: prompt }
-    ],
-    temperature: 0
+`
   });
 
-  const rawContent = response.choices[0].message.content;
-  console.log("🧠 OPENAI RAW RESPONSE:\n", rawContent);
+  const raw =
+    response.output_text ||
+    response.output[0].content[0].text;
 
-  return extractJson(rawContent);
+  console.log("🧠 AI RAW RFP:\n", raw);
+
+  const aiData = safeExtractJSON(raw);
+
+  // 🔐 Field-level fallback
+  return {
+    title: aiData.title || "Generated RFP",
+    description: aiData.description || userText,
+    budget: aiData.budget || extractBudgetFromText(userText),
+    items: Array.isArray(aiData.items) ? aiData.items : [],
+    deliveryTimeline: aiData.deliveryTimeline || "",
+    paymentTerms: aiData.paymentTerms || "",
+    warranty: aiData.warranty || ""
+  };
 }
+
+/* ---------- Proposal Parsing ---------- */
 
 async function parseVendorProposal(text) {
   try {
     const response = await client.responses.create({
       model: "gpt-5-nano",
       input: `
-You are parsing a vendor proposal email.
+Extract structured data from this vendor proposal.
 
-Extract:
-- price (number, if present)
-- deliveryTimeline (string)
-- paymentTerms (string)
-- warranty (string)
-
-Also generate a short 2–3 line summary.
-
-Return ONLY valid JSON in this format:
+Return ONLY valid JSON:
 {
   "price": number | null,
   "deliveryTimeline": "",
@@ -73,19 +82,18 @@ Return ONLY valid JSON in this format:
   "aiSummary": ""
 }
 
-Vendor response:
-${text}
+Proposal:
+"""${text}"""
 `
     });
 
-    const output =
+    const raw =
       response.output_text ||
       response.output[0].content[0].text;
 
-    return JSON.parse(output);
+    return JSON.parse(raw);
   } catch (err) {
     console.error("AI proposal parsing failed:", err);
-
     return {
       price: null,
       deliveryTimeline: "",
@@ -96,14 +104,11 @@ ${text}
   }
 }
 
-module.exports = {
-  generateRfpUsingAI: generateStructuredRFP,
-  parseVendorProposal
-};
+/* ---------- Proposal Comparison ---------- */
 
 async function compareProposalsWithAI(proposals) {
   try {
-    const summaryText = proposals.map(p => `
+    const summary = proposals.map(p => `
 Vendor: ${p.vendorId.name}
 Price: ${p.price || "N/A"}
 Delivery: ${p.deliveryTimeline || "N/A"}
@@ -114,12 +119,10 @@ Warranty: ${p.warranty || "N/A"}
     const response = await client.responses.create({
       model: "gpt-5-nano",
       input: `
-You are helping select the best vendor for an RFP.
-
-Compare the following proposals and recommend ONE vendor.
+Compare these proposals and recommend ONE vendor.
 Explain briefly why.
 
-${summaryText}
+${summary}
 `
     });
 
@@ -129,12 +132,12 @@ ${summaryText}
     );
   } catch (err) {
     console.error("AI comparison failed:", err);
-    return "AI recommendation unavailable. Please review proposals manually.";
+    return "AI recommendation unavailable. Please review manually.";
   }
 }
 
 module.exports = {
-  generateRfpUsingAI: generateStructuredRFP,
+  generateRfpUsingAI,
   parseVendorProposal,
   compareProposalsWithAI
 };
