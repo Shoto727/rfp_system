@@ -313,6 +313,25 @@ origin: "http://localhost:5173"
 - Reporting and analytics dashboard
 - Mobile app support
 
+## AI Tools Usage
+
+**Tools Used**: GitHub Copilot and ChatGPT
+
+**What They Helped With**:
+- **Copilot**: Code scaffolding, boilerplate generation, component structure
+- **ChatGPT**: Architecture planning, API integration guidance, debugging strategies
+
+**Key Applications**:
+- Outlined full-stack structure and component hierarchy before coding
+- Guided Nodemailer Gmail OAuth setup and error handling patterns
+- Refined prompt engineering for OpenAI email parsing
+- Resolved CORS issues and improved error messages
+
+**What I Learned**:
+- AI tools are best for patterns and scaffolding, not core business logic
+- Iterative refinement of AI suggestions was essential for quality
+- Strategic prompting ("how to structure") yielded better results than direct code requests
+
 ## License
 
 ISC
