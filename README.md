@@ -9,7 +9,7 @@ A full-stack web application for managing Request for Proposals (RFPs), vendors,
 - **Email Integration**: Send RFPs directly to vendors via email using Nodemailer
 - **Proposal Collection**: Vendors can submit proposals in response to RFPs
 - **Proposal Comparison**: Compare proposals from different vendors side-by-side
-- **AI-Powered Insights**: Integration with OpenAI and Google Generative AI for analysis
+- **AI-Powered Insights**: Integration with OpenAI for analysis
 - **Responsive UI**: Modern React-based frontend with Vite build tooling
 
 ## Tech Stack
@@ -220,8 +220,8 @@ PORT=3000
 - Side-by-side view of vendor responses
 
 ### VendorEmailInbox
-- View and manage vendor communications
-- Track proposal submissions
+- Paste and process vendor emails manually
+- OpenAI analysis on vendor email content
 
 ## Email Configuration
 
